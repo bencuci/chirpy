@@ -3,15 +3,29 @@ package main
 import (
 	"log"
 	"net/http"
+	"sync/atomic"
 )
+
+type apiConfig struct {
+	fileserverHits atomic.Int32
+}
 
 func main() {
 	const rootPath = "."
 	const port = "8080"
+	var apiCfg = apiConfig{
+		fileserverHits: atomic.Int32{},
+	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir(rootPath))))
-	mux.HandleFunc("/healthz", handlerReadiness)
+	handler := http.FileServer(http.Dir(rootPath))
+	mux.Handle("/app/", http.StripPrefix("/app", apiCfg.middlewareMetricsInc(handler)))
+
+	mux.HandleFunc("GET /api/healthz", handlerReadiness)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidate)
+
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerVisiterCount)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerResetVisiterCount)
 
 	server := &http.Server{
 		Addr:    ":" + port,
@@ -21,10 +35,4 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
-}
-
-func handlerReadiness(respWriter http.ResponseWriter, req *http.Request) {
-	req.Header.Set("Content-type", "text/plain; charset=utf-8")
-	respWriter.WriteHeader(http.StatusOK)
-	respWriter.Write([]byte("Checked health: OK"))
 }
