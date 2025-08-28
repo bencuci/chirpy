@@ -19,9 +19,6 @@ func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Reques
 	type parameters struct {
 		Email string `json:"email"`
 	}
-	type response struct {
-		User
-	}
 
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
@@ -44,5 +41,5 @@ func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Reques
 		Email:     createdUser.Email,
 	}
 
-	respondWithJSON(rw, http.StatusCreated, response{User: user})
+	respondWithJSON(rw, http.StatusCreated, user)
 }
