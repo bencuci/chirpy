@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 func handlerValidate(rw http.ResponseWriter, req *http.Request) {
+	type response struct {
+		CleanedBody string `json:"cleaned_body"`
+	}
 	type parameters struct {
 		Body string `json:"body"`
-	}
-	type response struct {
-		Valid bool `json:"valid"`
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -29,8 +30,24 @@ func handlerValidate(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// filter out banned words
 	resp := response{
-		Valid: true,
+		CleanedBody: getCleanedBody(params.Body),
 	}
+
 	respondWithJSON(rw, http.StatusOK, resp)
+}
+
+func getCleanedBody(body string) string {
+	bannedWords := map[string]struct{}{
+		"kerfuffle": {}, "sharbert": {}, "fornax": {},
+	}
+	words := strings.Fields(body)
+	for i, word := range words {
+		if _, exists := bannedWords[strings.ToLower(word)]; exists {
+			words[i] = "****"
+		}
+	}
+
+	return strings.Join(words, " ")
 }
