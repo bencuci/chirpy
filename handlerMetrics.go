@@ -6,7 +6,7 @@ import (
 )
 
 func (cfg *apiConfig) handlerVisiterCount(rw http.ResponseWriter, req *http.Request) {
-	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	rw.Header().Add("Content-Type", "text/html")
 	rw.WriteHeader(http.StatusOK)
 	hits := cfg.fileserverHits.Load()
 	rw.Write([]byte(fmt.Sprintf(

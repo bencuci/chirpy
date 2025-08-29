@@ -19,6 +19,28 @@ type Chirp struct {
 	UserID    uuid.UUID `json:"user_id"`
 }
 
+func (cfg *apiConfig) handlerGetChirps(rw http.ResponseWriter, req *http.Request) {
+	chirps, err := cfg.dbQueries.GetChirps(req.Context())
+	if err != nil {
+		respondWithError(rw, http.StatusInternalServerError, "Could not get chirps", err)
+		return
+	}
+
+	chirpsResponse := []Chirp{}
+	for _, chirpFromDB := range chirps {
+		chirp := Chirp{
+			ID:        chirpFromDB.ID,
+			CreatedAt: chirpFromDB.CreatedAt,
+			UpdatedAt: chirpFromDB.UpdatedAt,
+			Body:      chirpFromDB.Body,
+			UserID:    chirpFromDB.UserID,
+		}
+		chirpsResponse = append(chirpsResponse, chirp)
+	}
+
+	respondWithJSON(rw, http.StatusOK, chirpsResponse)
+}
+
 func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request) {
 	type parameters struct {
 		Body   string    `json:"body"`
@@ -35,7 +57,7 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 	}
 
 	// in case response body length exceeds the limit
-	err := handlerValidateChirp(rw, params.Body)
+	err := handlerValidateChirp(params.Body)
 	if err != nil {
 		respondWithError(rw, http.StatusBadRequest, "Chirp is too long", nil)
 		return
@@ -61,7 +83,7 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 	respondWithJSON(rw, http.StatusCreated, chirp)
 }
 
-func handlerValidateChirp(rw http.ResponseWriter, chirpBody string) error {
+func handlerValidateChirp(chirpBody string) error {
 	const maxChirpLength = 140
 	if len(chirpBody) > maxChirpLength {
 		return errors.New("Chirp is too long")
