@@ -41,6 +41,27 @@ func (cfg *apiConfig) handlerGetChirps(rw http.ResponseWriter, req *http.Request
 	respondWithJSON(rw, http.StatusOK, chirpsResponse)
 }
 
+func (cfg *apiConfig) handlerGetChirp(rw http.ResponseWriter, req *http.Request) {
+	userID, err := uuid.Parse(req.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(rw, http.StatusInternalServerError, "Couldn't parse path value", err)
+		return
+	}
+	chirp, err := cfg.dbQueries.GetChirp(req.Context(), userID)
+	if err != nil {
+		respondWithError(rw, http.StatusNotFound, "Couldn't find user", err)
+		return
+	}
+
+	respondWithJSON(rw, http.StatusOK, Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	})
+}
+
 func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request) {
 	type parameters struct {
 		Body   string    `json:"body"`
