@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/bencuci/chirpy/internal/auth"
 	"github.com/bencuci/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -15,8 +17,8 @@ type Chirp struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	Body      string    `json:"body"`
 	UserID    uuid.UUID `json:"user_id"`
+	Body      string    `json:"body"`
 }
 
 func (cfg *apiConfig) handlerGetChirps(rw http.ResponseWriter, req *http.Request) {
@@ -70,59 +72,70 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
-
-	// in case we cannot decode the response
-	if err := decoder.Decode(&params); err != nil {
-		respondWithError(rw, http.StatusInternalServerError, "Could not decode request", err)
-		return
-	}
-
-	// in case response body length exceeds the limit
-	err := handlerValidateChirp(params.Body)
+	err := decoder.Decode(&params)
 	if err != nil {
-		respondWithError(rw, http.StatusBadRequest, "Chirp is too long", nil)
+		respondWithError(rw, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
 	}
 
-	createdChirp, err := cfg.dbQueries.CreateChirp(req.Context(), database.CreateChirpParams{
-		Body:   getCleanedBody(params.Body),
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWithError(rw, http.StatusBadRequest, err.Error(), err)
+	}
+	_, err = auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(rw, http.StatusUnauthorized, err.Error(), err)
+		return
+	}
+
+	cleaned, err := validateChirp(params.Body)
+	if err != nil {
+		respondWithError(rw, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+
+	fmt.Printf("Requesting with ID of: %s", params.UserID)
+	chirp, err := cfg.dbQueries.CreateChirp(req.Context(), database.CreateChirpParams{
+		Body:   cleaned,
 		UserID: params.UserID,
 	})
 	if err != nil {
-		respondWithError(rw, http.StatusInternalServerError, "Could not post the chirp", err)
+		respondWithError(rw, http.StatusInternalServerError, "Couldn't create chirp", err)
 		return
 	}
 
-	chirp := Chirp{
-		ID:        createdChirp.ID,
-		CreatedAt: createdChirp.CreatedAt,
-		UpdatedAt: createdChirp.UpdatedAt,
-		Body:      createdChirp.Body,
-		UserID:    createdChirp.UserID,
-	}
-
-	respondWithJSON(rw, http.StatusCreated, chirp)
+	respondWithJSON(rw, http.StatusCreated, Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	})
 }
 
-func handlerValidateChirp(chirpBody string) error {
+func validateChirp(body string) (string, error) {
 	const maxChirpLength = 140
-	if len(chirpBody) > maxChirpLength {
-		return errors.New("Chirp is too long")
+	if len(body) > maxChirpLength {
+		return "", errors.New("Chirp is too long")
 	}
 
-	return nil
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+	cleaned := getCleanedBody(body, badWords)
+	return cleaned, nil
 }
 
-func getCleanedBody(body string) string {
-	bannedWords := map[string]struct{}{
-		"kerfuffle": {}, "sharbert": {}, "fornax": {},
-	}
-	words := strings.Fields(body)
+func getCleanedBody(body string, badWords map[string]struct{}) string {
+	words := strings.Split(body, " ")
 	for i, word := range words {
-		if _, exists := bannedWords[strings.ToLower(word)]; exists {
+		loweredWord := strings.ToLower(word)
+		if _, ok := badWords[loweredWord]; ok {
 			words[i] = "****"
 		}
 	}
-
-	return strings.Join(words, " ")
+	cleaned := strings.Join(words, " ")
+	return cleaned
 }

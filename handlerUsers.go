@@ -1,9 +1,9 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/bencuci/chirpy/internal/auth"
 	"github.com/bencuci/chirpy/internal/database"
@@ -11,17 +11,21 @@ import (
 )
 
 type User struct {
-	ID             uuid.UUID    `json:"id"`
-	CreatedAt      sql.NullTime `json:"created_at"`
-	UpdatedAt      sql.NullTime `json:"updated_at"`
-	Email          string       `json:"email"`
-	HashedPassword string       `json:"hashed_password"`
+	ID             uuid.UUID `json:"id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	Email          string    `json:"email"`
+	HashedPassword string    `json:"hashed_password"`
+	Token          string    `json:"token"`
 }
 
 func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Request) {
 	type parameters struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+	}
+	type response struct {
+		User
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -37,7 +41,7 @@ func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Reques
 		respondWithError(rw, http.StatusInternalServerError, "Couldn't hash the password", err)
 		return
 	}
-	createdUser, err := cfg.dbQueries.CreateUser(req.Context(), database.CreateUserParams{
+	user, err := cfg.dbQueries.CreateUser(req.Context(), database.CreateUserParams{
 		Email:          params.Email,
 		HashedPassword: hashedPW,
 	})
@@ -46,12 +50,12 @@ func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	user := User{
-		ID:        createdUser.ID,
-		CreatedAt: createdUser.CreatedAt,
-		UpdatedAt: createdUser.UpdatedAt,
-		Email:     createdUser.Email,
-	}
-
-	respondWithJSON(rw, http.StatusCreated, user)
+	respondWithJSON(rw, http.StatusCreated, response{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+	})
 }
