@@ -50,7 +50,7 @@ func (cfg *apiConfig) handlerGetChirp(rw http.ResponseWriter, req *http.Request)
 	}
 	chirp, err := cfg.dbQueries.GetChirp(req.Context(), userID)
 	if err != nil {
-		respondWithError(rw, http.StatusNotFound, "Couldn't find user", err)
+		respondWithError(rw, http.StatusNotFound, "Couldn't find chirp", err)
 		return
 	}
 
@@ -90,7 +90,7 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 	}
 
 	// in case response body length exceeds the limit
-	err = handlerValidateChirp(params.Body)
+	err = validateChirp(params.Body)
 	if err != nil {
 		respondWithError(rw, http.StatusBadRequest, "Chirp is too long", nil)
 		return
@@ -116,7 +116,42 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 	respondWithJSON(rw, http.StatusCreated, chirp)
 }
 
-func handlerValidateChirp(chirpBody string) error {
+func (cfg *apiConfig) handlerDeleteChirp(rw http.ResponseWriter, req *http.Request) {
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWithError(rw, http.StatusUnauthorized, err.Error(), err)
+		return
+	}
+
+	tokenUserID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(rw, http.StatusUnauthorized, err.Error(), err)
+		return
+	}
+
+	chirpID, err := uuid.Parse(req.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(rw, http.StatusInternalServerError, "Couldn't parse path value", err)
+		return
+	}
+
+	chirp, err := cfg.dbQueries.GetChirp(req.Context(), chirpID)
+	if err != nil {
+		respondWithError(rw, http.StatusNotFound, "Couldn't find chirp", err)
+		return
+	}
+
+	if chirp.UserID != tokenUserID {
+		respondWithError(rw, http.StatusForbidden, "Operation forbidden", nil)
+		return
+	}
+
+	cfg.dbQueries.DeleteChirp(req.Context(), chirp.ID)
+
+	respondWithJSON(rw, http.StatusNoContent, nil)
+}
+
+func validateChirp(chirpBody string) error {
 	const maxChirpLength = 140
 	if len(chirpBody) > maxChirpLength {
 		return errors.New("Chirp is too long")
