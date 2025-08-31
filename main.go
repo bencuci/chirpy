@@ -25,7 +25,10 @@ func main() {
 	const port = "8080"
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
-	secretKey := os.Getenv("SECRET")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is not set")
+	}
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -36,7 +39,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		dbQueries:      database.New(db),
 		platform:       platform,
-		secret:         secretKey,
+		secret:         jwtSecret,
 	}
 
 	mux := http.NewServeMux()

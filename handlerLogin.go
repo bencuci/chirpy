@@ -15,6 +15,11 @@ func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
 
+	type response struct {
+		User
+		Token string `json:"token"`
+	}
+
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
 	if err := decoder.Decode(&params); err != nil {
@@ -38,11 +43,13 @@ func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	respondWithJSON(rw, http.StatusOK, User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     token,
+	respondWithJSON(rw, http.StatusOK, response{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+		Token: token,
 	})
 }
