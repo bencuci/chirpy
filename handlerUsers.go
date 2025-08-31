@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -17,6 +19,7 @@ type User struct {
 	Email          string    `json:"email"`
 	HashedPassword string    `json:"hashed_password"`
 	Token          string    `json:"token"`
+	IsChirpyRed    bool      `json:"is_chirpy_red"`
 }
 
 func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Request) {
@@ -98,9 +101,44 @@ func (cfg *apiConfig) handlerUpdateUser(rw http.ResponseWriter, req *http.Reques
 	}
 
 	respondWithJSON(rw, http.StatusOK, User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	})
+}
+
+func (cfg *apiConfig) handlerUpgradeMembership(rw http.ResponseWriter, req *http.Request) {
+	type parameters struct {
+		Event string `json:"event"`
+		Data  struct {
+			UserID uuid.UUID `json:"user_id"`
+		} `json:"data"`
+	}
+
+	decoder := json.NewDecoder(req.Body)
+	params := parameters{}
+
+	if err := decoder.Decode(&params); err != nil {
+		respondWithError(rw, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		respondWithJSON(rw, http.StatusNoContent, nil)
+		return
+	}
+
+	_, err := cfg.dbQueries.UpgradeUserToChirpyRed(req.Context(), params.Data.UserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(rw, http.StatusNotFound, "user not found", err)
+			return
+		}
+		respondWithError(rw, http.StatusInternalServerError, "Couldn't update user", err)
+		return
+	}
+
+	respondWithJSON(rw, http.StatusNoContent, nil)
 }
