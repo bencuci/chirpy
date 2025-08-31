@@ -1,9 +1,9 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/bencuci/chirpy/internal/auth"
 	"github.com/bencuci/chirpy/internal/database"
@@ -11,12 +11,12 @@ import (
 )
 
 type User struct {
-	ID             uuid.UUID    `json:"id"`
-	CreatedAt      sql.NullTime `json:"created_at"`
-	UpdatedAt      sql.NullTime `json:"updated_at"`
-	Email          string       `json:"email"`
-	HashedPassword string       `json:"hashed_password"`
-	Token          string       `json:"token"`
+	ID             uuid.UUID `json:"id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	Email          string    `json:"email"`
+	HashedPassword string    `json:"hashed_password"`
+	Token          string    `json:"token"`
 }
 
 func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Request) {

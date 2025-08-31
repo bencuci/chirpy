@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bencuci/chirpy/internal/auth"
+	"github.com/bencuci/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
@@ -17,7 +18,8 @@ func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 
 	type response struct {
 		User
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -43,6 +45,16 @@ func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	refreshToken, err := auth.MakeRefreshToken()
+	_, err = cfg.dbQueries.CreateRefreshToken(req.Context(), database.CreateRefreshTokenParams{
+		Token:  refreshToken,
+		UserID: user.ID,
+	})
+	if err != nil {
+		respondWithError(rw, http.StatusInternalServerError, "Could not create jwt refresh token", err)
+		return
+	}
+
 	respondWithJSON(rw, http.StatusOK, response{
 		User: User{
 			ID:        user.ID,
@@ -50,6 +62,7 @@ func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
 		},
-		Token: token,
+		Token:        token,
+		RefreshToken: refreshToken,
 	})
 }
