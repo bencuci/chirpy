@@ -2,14 +2,17 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/bencuci/chirpy/internal/auth"
 	"net/http"
+	"time"
+
+	"github.com/bencuci/chirpy/internal/auth"
 )
 
 func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password         string `json:"password"`
+		Email            string `json:"email"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -19,9 +22,19 @@ func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if params.ExpiresInSeconds <= 0 || params.ExpiresInSeconds > 3600 {
+		params.ExpiresInSeconds = 3600
+	}
+
 	user, err := cfg.dbQueries.GetUser(req.Context(), params.Email)
 	if err != nil || auth.CheckPasswordHash(params.Password, user.HashedPassword) != nil {
 		respondWithError(rw, http.StatusUnauthorized, "Incorrect mail or password", err)
+		return
+	}
+
+	token, err := auth.MakeJWT(user.ID, cfg.secret, time.Duration(params.ExpiresInSeconds)*time.Second)
+	if err != nil {
+		respondWithError(rw, http.StatusInternalServerError, "Could not create jwt token: %v", err)
 		return
 	}
 
@@ -30,5 +43,6 @@ func (cfg *apiConfig) handlerLogin(rw http.ResponseWriter, req *http.Request) {
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
+		Token:     token,
 	})
 }

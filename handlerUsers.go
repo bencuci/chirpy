@@ -16,6 +16,7 @@ type User struct {
 	UpdatedAt      sql.NullTime `json:"updated_at"`
 	Email          string       `json:"email"`
 	HashedPassword string       `json:"hashed_password"`
+	Token          string       `json:"token"`
 }
 
 func (cfg *apiConfig) handlerCreateUser(rw http.ResponseWriter, req *http.Request) {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bencuci/chirpy/internal/auth"
 	"github.com/bencuci/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -77,8 +78,19 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 		return
 	}
 
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWithError(rw, http.StatusUnauthorized, err.Error(), err)
+		return
+	}
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(rw, http.StatusUnauthorized, err.Error(), err)
+		return
+	}
+
 	// in case response body length exceeds the limit
-	err := handlerValidateChirp(params.Body)
+	err = handlerValidateChirp(params.Body)
 	if err != nil {
 		respondWithError(rw, http.StatusBadRequest, "Chirp is too long", nil)
 		return
@@ -86,7 +98,7 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 
 	createdChirp, err := cfg.dbQueries.CreateChirp(req.Context(), database.CreateChirpParams{
 		Body:   getCleanedBody(params.Body),
-		UserID: params.UserID,
+		UserID: userID,
 	})
 	if err != nil {
 		respondWithError(rw, http.StatusInternalServerError, "Could not post the chirp", err)
@@ -98,7 +110,7 @@ func (cfg *apiConfig) handlerPostChirp(rw http.ResponseWriter, req *http.Request
 		CreatedAt: createdChirp.CreatedAt,
 		UpdatedAt: createdChirp.UpdatedAt,
 		Body:      createdChirp.Body,
-		UserID:    createdChirp.UserID,
+		UserID:    userID,
 	}
 
 	respondWithJSON(rw, http.StatusCreated, chirp)
