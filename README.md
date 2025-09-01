@@ -46,31 +46,29 @@ POLKA_KEY=your-polka-webhook-key
 
 ## API Endpoints
 
-### Authentication
-- `POST /api/login` - User login
-- `POST /api/refresh` - Refresh access token
+### Authentication & User Management
+- `POST /api/users` - Create new user (sign up)
+- `POST /api/login` - User login (returns access token)
+- `POST /api/refresh` - Refresh access token using refresh token
 - `POST /api/revoke` - Revoke refresh token
-
-### Users
-- `POST /api/users` - Create new user
-- `PUT /api/users` - Update user details
+- `PUT /api/users` - Update user details (email/password)
 
 ### Chirps
-- `DELETE /api/chirps/{chirpID}` - Delete a chirp
 - `POST /api/chirps` - Create a new chirp
-- `GET /api/chirps` - Get all chirps
+- `GET /api/chirps` - Get all chirps with optional parameters:
+  - `?author_id={userID}` - Filter chirps by user
+  - `?sort={sortingMethod}` - Sort by creation date ("asc" or "desc")
 - `GET /api/chirps/{chirpID}` - Get specific chirp
-- `GET /api/chirps?author_id={userID}` - Get chirps from specific user
-- `GET /api/chirps?sort={sortingMethod}` - Get chirps sorted by their creation date. 
-(sorting methods: "asc" for ascending, "desc" for descending)
+- `DELETE /api/chirps/{chirpID}` - Delete a chirp (requires authentication)
 
 ### Premium Features
-- `POST /api/polka/webhooks` - Webhook endpoint for premium membership upgrades
+- `POST /api/polka/webhooks` - Webhook endpoint for premium membership upgrades (requires Polka API key)
 
-### System
+### System & Metrics
 - `GET /api/healthz` - Health check endpoint
-- `GET /admin/metrics` - Get metrics
-- `POST /admin/reset` - Reset metrics counter
+- `GET /admin/metrics` - Get visitor metrics
+- `POST /admin/reset` - Reset visitor counter
+- `/app/*` - Static file server (with metrics tracking)
 
 ## Database Schema
 
