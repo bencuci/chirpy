@@ -21,20 +21,35 @@ type Chirp struct {
 }
 
 func (cfg *apiConfig) handlerGetChirps(rw http.ResponseWriter, req *http.Request) {
-	chirps, err := cfg.dbQueries.GetChirps(req.Context())
+	authorID, err := uuid.Parse(req.URL.Query().Get("author_id"))
 	if err != nil {
-		respondWithError(rw, http.StatusInternalServerError, "Could not get chirps", err)
+		respondWithError(rw, http.StatusInternalServerError, "Couldn't parse authorID", err)
 		return
 	}
 
+	chirps := []database.Chirp{}
+	if authorID != uuid.Nil {
+		chirps, err = cfg.dbQueries.GetChirpsFromUserID(req.Context(), authorID)
+		if err != nil {
+			respondWithError(rw, http.StatusInternalServerError, "Could not get chirps", err)
+			return
+		}
+	} else {
+		chirps, err = cfg.dbQueries.GetChirps(req.Context())
+		if err != nil {
+			respondWithError(rw, http.StatusInternalServerError, "Could not get chirps", err)
+			return
+		}
+	}
+
 	chirpsResponse := []Chirp{}
-	for _, chirpFromDB := range chirps {
+	for _, chirp := range chirps {
 		chirp := Chirp{
-			ID:        chirpFromDB.ID,
-			CreatedAt: chirpFromDB.CreatedAt,
-			UpdatedAt: chirpFromDB.UpdatedAt,
-			Body:      chirpFromDB.Body,
-			UserID:    chirpFromDB.UserID,
+			ID:        chirp.ID,
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
+			Body:      chirp.Body,
+			UserID:    chirp.UserID,
 		}
 		chirpsResponse = append(chirpsResponse, chirp)
 	}
