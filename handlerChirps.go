@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,10 +22,17 @@ type Chirp struct {
 }
 
 func (cfg *apiConfig) handlerGetChirps(rw http.ResponseWriter, req *http.Request) {
-	authorID, err := uuid.Parse(req.URL.Query().Get("author_id"))
-	if err != nil {
-		respondWithError(rw, http.StatusInternalServerError, "Couldn't parse authorID", err)
-		return
+	sortMethod := req.URL.Query().Get("sort")
+
+	var err error
+	authorID := uuid.Nil
+	authorIDString := req.URL.Query().Get("author_id")
+	if authorIDString != "" {
+		authorID, err = uuid.Parse(authorIDString)
+		if err != nil {
+			respondWithError(rw, http.StatusBadRequest, "Invalid author ID", err)
+			return
+		}
 	}
 
 	chirps := []database.Chirp{}
@@ -43,15 +51,21 @@ func (cfg *apiConfig) handlerGetChirps(rw http.ResponseWriter, req *http.Request
 	}
 
 	chirpsResponse := []Chirp{}
-	for _, chirp := range chirps {
+	for _, c := range chirps {
 		chirp := Chirp{
-			ID:        chirp.ID,
-			CreatedAt: chirp.CreatedAt,
-			UpdatedAt: chirp.UpdatedAt,
-			Body:      chirp.Body,
-			UserID:    chirp.UserID,
+			ID:        c.ID,
+			CreatedAt: c.CreatedAt,
+			UpdatedAt: c.UpdatedAt,
+			Body:      c.Body,
+			UserID:    c.UserID,
 		}
 		chirpsResponse = append(chirpsResponse, chirp)
+	}
+
+	if sortMethod == "desc" {
+		sort.Slice(chirpsResponse, func(i, j int) bool {
+			return chirpsResponse[i].CreatedAt.After(chirpsResponse[j].CreatedAt)
+		})
 	}
 
 	respondWithJSON(rw, http.StatusOK, chirpsResponse)
