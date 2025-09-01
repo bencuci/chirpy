@@ -117,6 +117,12 @@ func (cfg *apiConfig) handlerUpgradeMembership(rw http.ResponseWriter, req *http
 		} `json:"data"`
 	}
 
+	apiKey, err := auth.GetAPIKey(req.Header)
+	if err != nil || apiKey != cfg.polkaKey {
+		respondWithError(rw, http.StatusUnauthorized, err.Error(), err)
+		return
+	}
+
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
 
@@ -130,7 +136,7 @@ func (cfg *apiConfig) handlerUpgradeMembership(rw http.ResponseWriter, req *http
 		return
 	}
 
-	_, err := cfg.dbQueries.UpgradeUserToChirpyRed(req.Context(), params.Data.UserID)
+	_, err = cfg.dbQueries.UpgradeUserToChirpyRed(req.Context(), params.Data.UserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(rw, http.StatusNotFound, "user not found", err)
